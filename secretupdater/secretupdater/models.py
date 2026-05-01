@@ -20,6 +20,7 @@ import hashlib
 import base64
 import subprocess as sp
 import json
+from copy import deepcopy
 # silence some warnings:
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
@@ -80,10 +81,10 @@ def process(event):
             try:
                 k8s_auth = _get_k8s_auth(credentials=credentials)
             except BadEKSToken:
-                app.logger.error("unable to get EKS token for '{}'".format(credentials))
+                app.logger.error("unable to get EKS token for %s", _redact_credentials(credentials))
                 continue
             except ClusterAttributeError:
-                app.logger.error("error with cluster attributes for '{}'".format(credentials))
+                app.logger.error("error with cluster attributes for %s", _redact_credentials(credentials))
                 continue
 
             for config in k8s_auth:
@@ -425,6 +426,36 @@ def _get_k8s_auth(credentials):
         k8s_auth.append(config)
 
     return k8s_auth
+
+
+def _redact_credentials(credentials):
+    """Return a copy of a Confidant credentials list with sensitive values masked.
+
+    `credential_pairs` (the actual secret values) are replaced with '<redacted>'
+    so the surrounding metadata remains available for diagnostics.
+
+    Fail-closed: if `credential_pairs` is present but not a dict, the entire
+    value is replaced with '<redacted>' rather than passed through. Non-dict
+    entries in the list are dropped for the same reason.
+    """
+    redacted = []
+    for entry in credentials or []:
+        if not isinstance(entry, dict):
+            continue
+
+        entry_copy = deepcopy(entry)
+
+        if 'credential_pairs' in entry_copy:
+            value = entry_copy['credential_pairs']
+
+            if isinstance(value, dict):
+                entry_copy['credential_pairs'] = {k: '<redacted>' for k in value}
+            else:
+                entry_copy['credential_pairs'] = '<redacted>'
+
+        redacted.append(entry_copy)
+
+    return redacted
 
 
 class NamespaceNoDeploymentError(Exception):
