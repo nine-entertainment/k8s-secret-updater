@@ -6,7 +6,7 @@ ipython==8.21.0
 jedi==0.19.1
 matplotlib-inline==0.1.6
 mccabe==0.7.0
-parso==0.8.3
+parso==0.8.7
 pexpect==4.9.0
 prompt-toolkit==3.0.43
 ptyprocess==0.7.0
